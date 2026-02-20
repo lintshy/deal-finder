@@ -1,0 +1,10 @@
+{
+  "actionGroup": "ScraperTools",
+  "function": "parse_deals",
+  "parameters": [
+    { "name": "content", "value": "{\"props\":{\"pageProps\":{\"initialState\":{\"Wall\":{\"products\":[{\"id\":\"abc123\",\"title\":\"Air Max 90\",\"url\":\"/t/air-max-90\",\"prices\":{\"compareAtPrice\":{\"value\":120},\"currentPrice\":{\"value\":72}},\"images\":{\"portraitURL\":\"https://static.nike.com/img.jpg\"}}]}}}}}", "type": "string" },
+    { "name": "retailer", "value": "nike", "type": "string" },
+    { "name": "category", "value": "sneakers", "type": "string" },
+    { "name": "min_discount_pct", "value": "30", "type": "string" }
+  ]
+}

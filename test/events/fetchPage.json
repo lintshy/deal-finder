@@ -1,0 +1,9 @@
+{
+  "actionGroup": "ScraperTools",
+  "function": "fetch_page",
+  "parameters": [
+    { "name": "url", "value": "https://www.nike.com/w/sale-3yaep", "type": "string" },
+    { "name": "retailer", "value": "nike", "type": "string" },
+    { "name": "category", "value": "sneakers", "type": "string" }
+  ]
+}
