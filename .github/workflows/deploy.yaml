@@ -8,13 +8,7 @@ on:
   push:
     branches:
       - main
-    paths:
-      # Only trigger if source code or deps actually changed
-      # Avoids unnecessary deploys on README edits etc.
-      - "src/**"
-      - "package*.json"
-      - "tsconfig.json"
-      - ".github/workflows/deploy.yml"
+
 
 jobs:
   deploy:
