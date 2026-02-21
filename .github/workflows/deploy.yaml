@@ -70,6 +70,7 @@ jobs:
         run: |
           aws lambda update-function-configuration \
             --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
+            --handler handler.handler \
             --environment "Variables={
               DEALS_TABLE_NAME=${{ secrets.DEALS_TABLE_NAME }},
             }" \
