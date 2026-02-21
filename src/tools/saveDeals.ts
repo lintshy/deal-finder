@@ -9,10 +9,10 @@ const dynamoEndpoint = process.env.DYNAMODB_ENDPOINT; // set by docker-compose
 const client = new DynamoDBClient(
   isLocal && dynamoEndpoint
     ? {
-        endpoint: dynamoEndpoint,
-        region: "us-east-1",
-        credentials: { accessKeyId: "fake", secretAccessKey: "fake" },
-      }
+      endpoint: dynamoEndpoint,
+      region: "us-east-1",
+      credentials: { accessKeyId: "fake", secretAccessKey: "fake" },
+    }
     : {} // in real Lambda, SDK picks up IAM role automatically
 );
 const docClient = DynamoDBDocumentClient.from(client);
@@ -28,6 +28,12 @@ export async function saveDeals(params: ToolParams): Promise<string> {
   let deals: Deal[];
   try {
     deals = JSON.parse(dealsRaw) as Deal[];
+    console.log("[saveDeals] Starting batch write", {
+      totalDeals: deals.length,
+      retailers: [...new Set(deals.map(d => d.retailer))],
+      categories: [...new Set(deals.map(d => d.category))],
+      table: TABLE_NAME,
+    });
   } catch {
     return errorResponse("deals must be a valid JSON array string");
   }
@@ -44,7 +50,7 @@ export async function saveDeals(params: ToolParams): Promise<string> {
   const errors: string[] = [];
   let saved = 0;
 
-  for (const chunk of chunks) {
+  for (const [index, chunk] of chunks.entries()) {
     const putRequests = chunk.map((deal) => ({
       PutRequest: {
         Item: {
@@ -75,8 +81,17 @@ export async function saveDeals(params: ToolParams): Promise<string> {
         result.UnprocessedItems?.[TABLE_NAME]?.length ?? 0;
       saved += chunk.length - unprocessed;
 
+      console.log(`[saveDeals] ✅ Chunk ${index + 1} written successfully`, {
+        attempted: chunk.length,
+        saved,
+        unprocessed,
+        ttlExpiry: new Date(ttl * 1000).toISOString(),
+      });
+
       if (unprocessed > 0) {
-        errors.push(`${unprocessed} items were not processed (DynamoDB throttling)`);
+        const msg = `${unprocessed} items unprocessed in chunk ${index + 1} (DynamoDB throttling)`;
+        console.warn(`[saveDeals] ⚠️ ${msg}`);
+        errors.push(msg);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

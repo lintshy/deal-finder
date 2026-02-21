@@ -6,7 +6,9 @@
   "scripts": {
     "test:local": "ts-node test/runLocal.ts",
     "build": "esbuild src/handler.ts --bundle --platform=node --target=node20 --outfile=dist/handler.js",
-    "deploy": "npm run build && zip -j dist/handler.zip dist/handler.js && aws lambda update-function-code --function-name ScraperToolsLambda --zip-file fileb://dist/handler.zip"
+    "deploy": "npm run build && zip -j dist/handler.zip dist/handler.js && aws lambda update-function-code --function-name ScraperToolsLambda --zip-file fileb://dist/handler.zip",
+    "lint": "eslint . --ext .ts,.js --max-warnings=0",
+    "format": "prettier --write ."
   },
   "repository": {
     "type": "git",
