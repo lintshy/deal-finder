@@ -75,7 +75,14 @@ jobs:
             }" \
             --region ${{ secrets.AWS_REGION }}
 
-      # ── 10. Publish a new version ──────────────────────────────────────────
+      # ── 10. Wait for CONFIGURATION update to finish ────────────────────────
+      - name: Wait for configuration update
+        run: |
+          aws lambda wait function-updated \
+            --function-name ${{ secrets.LAMBDA_FUNCTION_NAME }} \
+            --region ${{ secrets.AWS_REGION }}
+
+      # ── 11. Publish a new version ──────────────────────────────────────────
       - name: Publish Lambda version
         id: publish
         run: |
@@ -87,7 +94,7 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Published version: $VERSION"
 
-      # ── 11. Summary ───────────────────────────────────────────────────────
+      # ── 12. Summary ───────────────────────────────────────────────────────
       - name: Deployment summary
         run: |
           echo "### ✅ Deployment Successful" >> $GITHUB_STEP_SUMMARY
