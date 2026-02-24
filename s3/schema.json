@@ -1,0 +1,121 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "ScraperTools",
+        "version": "1.0.0"
+    },
+    "paths": {
+        "/fetch_page": {
+            "post": {
+                "operationId": "fetch_page",
+                "description": "Fetches a retailer product listing page and extracts its embedded JSON data. Returns content to be passed to parse_deals.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "url",
+                                    "retailer"
+                                ],
+                                "properties": {
+                                    "url": {
+                                        "type": "string",
+                                        "description": "Full URL of the retailer sale or category page to scrape"
+                                    },
+                                    "retailer": {
+                                        "type": "string",
+                                        "description": "Retailer identifier e.g. nike or macys"
+                                    },
+                                    "category": {
+                                        "type": "string",
+                                        "description": "Product category being scraped e.g. sneakers hoodies dresses"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Page content extracted successfully"
+                    }
+                }
+            }
+        },
+        "/parse_deals": {
+            "post": {
+                "operationId": "parse_deals",
+                "description": "Parses raw page content returned by fetch_page to extract products with significant discounts meeting the minimum discount threshold.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "content",
+                                    "retailer"
+                                ],
+                                "properties": {
+                                    "content": {
+                                        "type": "string",
+                                        "description": "Raw content string returned from fetch_page"
+                                    },
+                                    "retailer": {
+                                        "type": "string",
+                                        "description": "Retailer identifier e.g. nike or macys"
+                                    },
+                                    "category": {
+                                        "type": "string",
+                                        "description": "Product category e.g. sneakers"
+                                    },
+                                    "min_discount_pct": {
+                                        "type": "string",
+                                        "description": "Minimum discount percentage to include as a deal. Defaults to 30 if not provided"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "List of deals parsed from the page content"
+                    }
+                }
+            }
+        },
+        "/save_deals": {
+            "post": {
+                "operationId": "save_deals",
+                "description": "Saves a list of parsed deals to DynamoDB. The deals parameter must be a JSON stringified array of deal objects returned from parse_deals.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "deals"
+                                ],
+                                "properties": {
+                                    "deals": {
+                                        "type": "string",
+                                        "description": "JSON stringified array of deal objects returned from parse_deals"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Deals saved to DynamoDB successfully"
+                    }
+                }
+            }
+        }
+    }
+}
