@@ -51,41 +51,59 @@ export async function parseDeals(params: ToolParams): Promise<string> {
 }
 
 // ─── Nike ────────────────────────────────────────────────────────────────────
+//
+// Source: api.nike.com/cic/browse/v2 (called via fetchPage for Nike URLs).
+// Response shape: data.products.products[]
+//   .id, .title, .subtitle, .url
+//   .images.portraitURL
+//   .prices.currentPrice  (number — sale price)
+//   .prices.fullPrice     (number — original price)
+//   .prices.discounted    (boolean)
 
-interface NikeProduct {
+interface NikeApiProduct {
   id?: string;
   title?: string;
+  subtitle?: string;
   url?: string;
-  prices?: {
-    compareAtPrice?: { value?: number };
-    currentPrice?: { value?: number };
-  };
   images?: { portraitURL?: string };
+  prices?: {
+    currentPrice?: number;
+    fullPrice?: number;
+    discounted?: boolean;
+  };
+}
+
+interface NikeApiResponse {
+  data?: {
+    products?: {
+      products?: NikeApiProduct[];
+    };
+  };
 }
 
 function parseNike(data: unknown, category: string, minDiscount: number): Deal[] {
-  const root = data as Record<string, unknown>;
+  const root = data as NikeApiResponse;
+  const productList: NikeApiProduct[] =
+    root?.data?.products?.products ?? [];
 
-  // Navigate Nike's __NEXT_DATA__ → adjust path by inspecting live response
-  const products = (
-    (root?.props as Record<string, unknown>)?.pageProps as Record<string, unknown>
-  )?.initialState as Record<string, unknown>;
-
-  const productList: NikeProduct[] =
-    ((products?.Wall as Record<string, unknown>)?.products as NikeProduct[]) ?? [];
+  if (productList.length === 0) {
+    console.warn("[parseNike] No products found — check API response shape");
+  }
 
   return productList.reduce<Deal[]>((acc, p) => {
-    const original = p.prices?.compareAtPrice?.value;
-    const sale = p.prices?.currentPrice?.value;
+    const original = p.prices?.fullPrice;
+    const sale = p.prices?.currentPrice;
 
     if (!original || !sale || sale >= original) return acc;
 
     const discountPct = Math.round((1 - sale / original) * 1000) / 10;
     if (discountPct < minDiscount) return acc;
 
+    const name = [p.title, p.subtitle].filter(Boolean).join(" — ");
+
     acc.push({
       id: p.id ?? crypto.randomUUID(),
-      name: p.title ?? "Unknown",
+      name: name || "Unknown",
       category,
       retailer: "nike",
       originalPrice: original,

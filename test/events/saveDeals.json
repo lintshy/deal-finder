@@ -1,11 +1,26 @@
 {
-  "actionGroup": "ScraperTools",
-  "function": "save_deals",
-  "parameters": [
-    {
-      "name": "deals",
-      "type": "string",
-      "value": "[{\"id\":\"abc123\",\"name\":\"Air Max 90\",\"category\":\"sneakers\",\"retailer\":\"nike\",\"originalPrice\":120,\"salePrice\":72,\"discountPct\":40,\"imageUrl\":\"https://static.nike.com/img.jpg\",\"productUrl\":\"https://www.nike.com/t/air-max-90\"},{\"id\":\"def456\",\"name\":\"Air Force 1\",\"category\":\"sneakers\",\"retailer\":\"nike\",\"originalPrice\":110,\"salePrice\":60,\"discountPct\":45.5,\"imageUrl\":\"https://static.nike.com/img2.jpg\",\"productUrl\":\"https://www.nike.com/t/air-force-1\"},{\"id\":\"ghi789\",\"name\":\"Floral Wrap Dress\",\"category\":\"dresses\",\"retailer\":\"macys\",\"originalPrice\":89.99,\"salePrice\":44.99,\"discountPct\":50,\"imageUrl\":\"https://slimages.macysassets.com/img3.jpg\",\"productUrl\":\"https://www.macys.com/shop/product/floral-wrap-dress\"}]"
+  "messageVersion": "1.0",
+  "actionGroup": "deal-scraper-agent-action-group",
+  "apiPath": "/save_deals",
+  "httpMethod": "POST",
+  "requestBody": {
+    "content": {
+      "application/json": {
+        "properties": [
+          {
+            "name": "deals",
+            "type": "string",
+            "value": "[{\"id\":\"abc123\",\"name\":\"Air Max 90\",\"category\":\"sneakers\",\"retailer\":\"nike\",\"originalPrice\":120,\"salePrice\":72,\"discountPct\":40,\"imageUrl\":\"https://static.nike.com/img.jpg\",\"productUrl\":\"https://www.nike.com/t/air-max-90\"},{\"id\":\"def456\",\"name\":\"Air Force 1\",\"category\":\"sneakers\",\"retailer\":\"nike\",\"originalPrice\":110,\"salePrice\":60,\"discountPct\":45.5,\"imageUrl\":\"https://static.nike.com/img2.jpg\",\"productUrl\":\"https://www.nike.com/t/air-force-1\"},{\"id\":\"ghi789\",\"name\":\"Floral Wrap Dress\",\"category\":\"dresses\",\"retailer\":\"macys\",\"originalPrice\":89.99,\"salePrice\":44.99,\"discountPct\":50,\"imageUrl\":\"https://slimages.macysassets.com/img3.jpg\",\"productUrl\":\"https://www.macys.com/shop/product/floral-wrap-dress\"}]"
+          }
+        ]
+      }
     }
-  ]
+  },
+  "sessionId": "test-session-001",
+  "agent": {
+    "name": "DealScraperAgent",
+    "version": "DRAFT",
+    "id": "HWJJGTQBXE",
+    "alias": "TSTALIASID"
+  }
 }
