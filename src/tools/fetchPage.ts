@@ -29,7 +29,7 @@ export async function fetchPage(params: ToolParams): Promise<string> {
 
     const html = response.data;
     const content = extractForRetailer(html, retailer);
-
+    console.log(`Fetched ${url} (category: ${category}, retailer: ${retailer}) - content length: ${content.length}`);
     return JSON.stringify({
       success: true,
       url,

@@ -98,7 +98,7 @@ export async function saveDeals(params: ToolParams): Promise<string> {
       errors.push(`Batch write failed: ${message}`);
     }
   }
-
+  console.log(`[saveDeals] Completed with ${saved} deals saved and ${errors.length} errors`);
   return JSON.stringify({
     success: errors.length === 0,
     saved,

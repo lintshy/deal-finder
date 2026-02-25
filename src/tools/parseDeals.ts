@@ -40,7 +40,7 @@ export async function parseDeals(params: ToolParams): Promise<string> {
     const message = err instanceof Error ? err.message : String(err);
     return errorResponse(`Parsing failed: ${message}`);
   }
-
+  console.log(`Parsed deals for ${retailer} (category: ${category}) - found ${deals.length} deals with min discount ${minDiscount}%`);
   return JSON.stringify({
     success: true,
     retailer,
