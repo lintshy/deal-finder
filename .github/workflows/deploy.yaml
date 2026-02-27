@@ -43,14 +43,21 @@ jobs:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # ── 6. Zip the build output ────────────────────────────────────────────
+      # ── 6. Upload OpenAPI schema to S3 ────────────────────────────────────
+      - name: Upload schema to S3
+        run: |
+          aws s3 cp s3/schema.json \
+            s3://deal-scraper-bucket/scraper-agent/schema.json \
+            --region ${{ secrets.AWS_REGION }}
+
+      # ── 7. Zip the build output ────────────────────────────────────────────
       - name: Zip build artifact
         run: |
           cd dist
           zip -j handler.zip handler.js
           echo "Artifact size: $(du -sh handler.zip | cut -f1)"
 
-      # ── 7. Deploy to Lambda ────────────────────────────────────────────────
+      # ── 8. Deploy to Lambda ────────────────────────────────────────────────
       - name: Deploy to AWS Lambda
         run: |
           aws lambda update-function-code \
@@ -95,11 +102,32 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Published version: $VERSION"
 
-      # ── 12. Summary ───────────────────────────────────────────────────────
+      # ── 12. Update Bedrock action group (re-reads schema from S3) ───────────
+      # Requires secrets: BEDROCK_AGENT_ID, BEDROCK_ACTION_GROUP_ID
+      - name: Update Bedrock action group
+        run: |
+          aws bedrock-agent update-agent-action-group \
+            --agent-id ${{ secrets.BEDROCK_AGENT_ID }} \
+            --agent-version DRAFT \
+            --action-group-id ${{ secrets.BEDROCK_ACTION_GROUP_ID }} \
+            --action-group-name "ScraperTools" \
+            --action-group-executor "{\"lambda\": \"arn:aws:lambda:${{ secrets.AWS_REGION }}:${{ secrets.AWS_ACCOUNT_ID }}:function:${{ secrets.LAMBDA_FUNCTION_NAME }}\"}" \
+            --api-schema "{\"s3\": {\"s3BucketName\": \"deal-scraper-bucket\", \"s3ObjectKey\": \"scraper-agent/schema.json\"}}" \
+            --region ${{ secrets.AWS_REGION }}
+
+      # ── 13. Prepare agent (compiles schema + Lambda into new DRAFT) ──────────
+      - name: Prepare Bedrock agent
+        run: |
+          aws bedrock-agent prepare-agent \
+            --agent-id ${{ secrets.BEDROCK_AGENT_ID }} \
+            --region ${{ secrets.AWS_REGION }}
+
+      # ── 14. Summary ───────────────────────────────────────────────────────
       - name: Deployment summary
         run: |
           echo "### ✅ Deployment Successful" >> $GITHUB_STEP_SUMMARY
           echo "- **Function:** ${{ secrets.LAMBDA_FUNCTION_NAME }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Version:** ${{ steps.publish.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Schema:** s3://deal-scraper-bucket/scraper-agent/schema.json" >> $GITHUB_STEP_SUMMARY
           echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "- **Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
