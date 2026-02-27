@@ -31,7 +31,7 @@ interface BedrockApiEvent {
 }
 
 // Function definition event format (alternative)
-interface BedrockFunctionEvent {
+export interface BedrockFunctionEvent {
   messageVersion: string;
   actionGroup: string;
   function: string;
@@ -114,7 +114,7 @@ function buildFunctionResponse(
   };
 }
 
-export const handler = async (event: BedrockEvent): Promise<unknown> => {
+export const handler = async (event: BedrockEvent): Promise<any> => {
   console.log("Bedrock Agent event: ", JSON.stringify(event, null, 4));
 
   const toolName = extractToolName(event);

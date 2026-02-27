@@ -1,6 +1,6 @@
 import axios from "axios";
 import { ToolParams } from "../types";
-import { nikeStoreUrlToApiUrl, extractForRetailer } from "../utils/extractors";
+import { extractJsonLdProducts, extractNextDataProducts } from "../utils/extractors";
 import { errorResponse } from "../utils/response";
 
 const BROWSER_HEADERS = {
@@ -13,25 +13,12 @@ const BROWSER_HEADERS = {
   Connection: "keep-alive",
 };
 
-const NIKE_API_HEADERS = {
-  "User-Agent":
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-  Accept: "application/json",
-  "Accept-Language": "en-US,en;q=0.9",
-  "Nike-API-Caller-Id": "com.nike.commerce.nikedotcom.web",
-};
-
 export async function fetchPage(params: ToolParams): Promise<string> {
   const { url, category = "", retailer = "" } = params;
 
   if (!url) return errorResponse("url parameter is required");
 
   try {
-    if (retailer.toLowerCase() === "nike") {
-      return await fetchNikeApi(url, category);
-    }
-
-    // Generic HTML fetch for other retailers
     const response = await axios.get<string>(url, {
       headers: BROWSER_HEADERS,
       timeout: 15_000,
@@ -40,44 +27,39 @@ export async function fetchPage(params: ToolParams): Promise<string> {
     });
 
     const html = response.data;
-    const content = extractForRetailer(html, retailer);
-    console.log(
-      `Fetched ${url} (category: ${category}, retailer: ${retailer}) - content length: ${content.length}`
-    );
+    let products = extractJsonLdProducts(html, category);
+    let source = "jsonld";
+
+    if (products.length === 0) {
+      products = extractNextDataProducts(html, category);
+      source = "nextdata";
+    }
+
+    if (products.length === 0) {
+      console.warn(`[fetchPage] No product data found at ${url}`);
+      return JSON.stringify({
+        success: false,
+        url,
+        category,
+        retailer,
+        error: "No product data found. Neither JSON-LD nor a recognised __NEXT_DATA__ structure was present.",
+      });
+    }
+
+    console.log(`[fetchPage] Found ${products.length} products via ${source} at ${url} (category: ${category}, retailer: ${retailer})`);
+
+    // Return products as an actual JSON array — not a stringified blob —
+    // so the agent can read prices and names directly from the response.
     return JSON.stringify({
       success: true,
       url,
       category,
       retailer,
-      content,
+      products,
+      productCount: products.length,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return errorResponse(`Failed to fetch ${url}: ${message}`);
   }
-}
-
-async function fetchNikeApi(storeUrl: string, category: string): Promise<string> {
-  const apiUrl = nikeStoreUrlToApiUrl(storeUrl);
-  console.log(`[Nike] Calling API: ${apiUrl}`);
-
-  const response = await axios.get<unknown>(apiUrl, {
-    headers: NIKE_API_HEADERS,
-    timeout: 15_000,
-    decompress: true,
-  });
-
-  // The API response is already parsed JSON — stringify it for the pipeline
-  const content = JSON.stringify(response.data);
-  console.log(
-    `[Nike] API response received (category: ${category}) - content length: ${content.length}`
-  );
-
-  return JSON.stringify({
-    success: true,
-    url: storeUrl,
-    category,
-    retailer: "nike",
-    content,
-  });
 }

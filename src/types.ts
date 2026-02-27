@@ -21,6 +21,18 @@ export interface BedrockAgentResponse {
   };
 }
 
+// Standard shape returned by fetch_page — one entry per product on the page.
+// originalPrice/salePrice are null when the page doesn't expose both prices.
+export interface FetchedProduct {
+  name: string;
+  category: string;
+  originalPrice: number | null;
+  salePrice: number | null;
+  currency: string;
+  imageUrl: string;
+  productUrl: string;
+}
+
 // Domain types
 export interface Deal {
   id: string;

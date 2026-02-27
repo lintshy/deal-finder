@@ -8,17 +8,14 @@
         "/fetch_page": {
             "post": {
                 "operationId": "fetch_page",
-                "description": "Fetches a retailer product listing page and extracts its embedded JSON data. Returns content to be passed to parse_deals.",
+                "description": "Fetches a retailer product listing or sale page and returns a normalised list of products with name, pricing, and image data. Tries schema.org JSON-LD first, then falls back to Next.js __NEXT_DATA__. Pass the returned products array (JSON-stringified) as the content parameter to parse_deals.",
                 "requestBody": {
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "type": "object",
-                                "required": [
-                                    "url",
-                                    "retailer"
-                                ],
+                                "required": ["url", "retailer"],
                                 "properties": {
                                     "url": {
                                         "type": "string",
@@ -39,7 +36,37 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Page content extracted successfully"
+                        "description": "Products extracted successfully",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "success": { "type": "boolean" },
+                                        "url": { "type": "string" },
+                                        "category": { "type": "string" },
+                                        "retailer": { "type": "string" },
+                                        "productCount": { "type": "integer" },
+                                        "products": {
+                                            "type": "array",
+                                            "description": "Normalised product list. JSON-stringify this array and pass it as the content parameter to parse_deals.",
+                                            "items": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "name":          { "type": "string" },
+                                                    "category":      { "type": "string" },
+                                                    "originalPrice": { "type": "number", "nullable": true },
+                                                    "salePrice":     { "type": "number", "nullable": true },
+                                                    "currency":      { "type": "string" },
+                                                    "imageUrl":      { "type": "string" },
+                                                    "productUrl":    { "type": "string" }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -47,21 +74,30 @@
         "/parse_deals": {
             "post": {
                 "operationId": "parse_deals",
-                "description": "Parses raw page content returned by fetch_page to extract products with significant discounts meeting the minimum discount threshold.",
+                "description": "Filters the products returned by fetch_page to those with a discount meeting the minimum threshold, calculates the discount percentage, and returns a structured deals list ready for save_deals.",
                 "requestBody": {
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "type": "object",
-                                "required": [
-                                    "content",
-                                    "retailer"
-                                ],
+                                "required": ["content", "retailer"],
                                 "properties": {
                                     "content": {
-                                        "type": "string",
-                                        "description": "Raw content string returned from fetch_page"
+                                        "type": "array",
+                                        "description": "Products array from the fetch_page response",
+                                        "items": {
+                                            "type": "object",
+                                            "properties": {
+                                                "name":          { "type": "string" },
+                                                "category":      { "type": "string" },
+                                                "originalPrice": { "type": "number", "nullable": true },
+                                                "salePrice":     { "type": "number", "nullable": true },
+                                                "currency":      { "type": "string" },
+                                                "imageUrl":      { "type": "string" },
+                                                "productUrl":    { "type": "string" }
+                                            }
+                                        }
                                     },
                                     "retailer": {
                                         "type": "string",
@@ -82,7 +118,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "List of deals parsed from the page content"
+                        "description": "Deals filtered and shaped successfully"
                     }
                 }
             }
@@ -97,9 +133,7 @@
                         "application/json": {
                             "schema": {
                                 "type": "object",
-                                "required": [
-                                    "deals"
-                                ],
+                                "required": ["deals"],
                                 "properties": {
                                     "deals": {
                                         "type": "string",

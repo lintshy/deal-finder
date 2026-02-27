@@ -1,91 +1,198 @@
-// Retailer-specific strategies for obtaining product data.
-// For Nike we skip HTML entirely and call their product feed API directly —
-// this avoids anti-bot protections and gives us clean, structured JSON.
+// Product data extractors for HTML pages.
+// All extractors normalize their output to FetchedProduct[] so fetchPage
+// returns a standard shape regardless of the source site.
 
-// ─── Nike API ─────────────────────────────────────────────────────────────────
+import { FetchedProduct } from "../types";
 
-// Known Nike concept attribute IDs (stable — used in filter params).
-// These come from the `selectedConcepts` in the page's __NEXT_DATA__ and
-// match the encoded slugs in the /w/ URLs.
-const NIKE_CONCEPTS: Record<string, string> = {
-  shoes:     "16633190-45e5-4830-a068-232ac7aea82c",
-  men:       "0f64ecc7-d624-4e91-b171-b83a03dd8550",
-  women:     "7baf216c-acc6-4452-9e07-39c2ca77ba32",
-  clearance: "5b21a62a-0503-400c-8336-3ccfbff2a684",
-  tops:      "2f9d6a32-6edd-4a9c-8d0c-6b1900b97a17",
-  pants:     "0d3f88b0-05a3-4eed-af38-ff31e3c5f2e9",
-};
+// ─── Price helpers ────────────────────────────────────────────────────────────
 
-// Map a nike.com store URL to a set of concept IDs to filter by.
-// Derived from the human-readable slug (e.g. "mens-sale-shoes").
-function conceptIdsForNikeUrl(storeUrl: string): string[] {
-  const slug = storeUrl.match(/\/w\/([^?#/]+)/)?.[1]?.toLowerCase() ?? "";
-  const ids: string[] = [];
+interface SchemaOffer {
+  "@type"?: string;
+  price?: number | string;
+  lowPrice?: number | string;
+  highPrice?: number | string;
+  priceCurrency?: string;
+  priceType?: string;
+  priceSpecification?: SchemaOffer | SchemaOffer[];
+}
 
-  if (/sale|clearance/.test(slug))  ids.push(NIKE_CONCEPTS.clearance);
-  if (/men/.test(slug) && !/women/.test(slug)) ids.push(NIKE_CONCEPTS.men);
-  if (/women/.test(slug))           ids.push(NIKE_CONCEPTS.women);
-  if (/shoe/.test(slug))            ids.push(NIKE_CONCEPTS.shoes);
-  if (/top|shirt|hoodie/.test(slug)) ids.push(NIKE_CONCEPTS.tops);
-  if (/pant|tight|legging/.test(slug)) ids.push(NIKE_CONCEPTS.pants);
+interface SchemaProduct {
+  "@id"?: string;
+  name?: string;
+  url?: string;
+  image?: string | string[] | { url?: string };
+  offers?: SchemaOffer | SchemaOffer[];
+}
 
-  return ids;
+function extractPrices(offers: SchemaOffer | SchemaOffer[] | undefined): {
+  sale: number | null;
+  original: number | null;
+  currency: string;
+} {
+  if (!offers) return { sale: null, original: null, currency: "USD" };
+
+  const offerArr = Array.isArray(offers) ? offers : [offers];
+  let sale: number | null = null;
+  let original: number | null = null;
+  let currency = "USD";
+
+  for (const offer of offerArr) {
+    if (!offer) continue;
+
+    if (offer.priceCurrency) currency = offer.priceCurrency;
+
+    // AggregateOffer: lowPrice = sale price, highPrice = original/list price
+    if (offer["@type"] === "AggregateOffer") {
+      if (offer.lowPrice  != null) sale     = parseFloat(String(offer.lowPrice));
+      if (offer.highPrice != null) original = parseFloat(String(offer.highPrice));
+      continue;
+    }
+
+    // Offer with explicit priceType label
+    if (offer.priceType === "SalePrice" && offer.price != null) {
+      sale = parseFloat(String(offer.price)); continue;
+    }
+    if (offer.priceType === "ListPrice" && offer.price != null) {
+      original = parseFloat(String(offer.price)); continue;
+    }
+
+    // priceSpecification array inside an Offer
+    if (offer.priceSpecification) {
+      const specs = Array.isArray(offer.priceSpecification)
+        ? offer.priceSpecification
+        : [offer.priceSpecification];
+      for (const spec of specs) {
+        if (!spec) continue;
+        const t = spec["@type"] ?? spec.priceType ?? "";
+        if (/sale/i.test(t)  && spec.price != null) sale     = parseFloat(String(spec.price));
+        if (/list/i.test(t)  && spec.price != null) original = parseFloat(String(spec.price));
+      }
+      continue;
+    }
+
+    // Plain Offer — treat as sale price if we don't have one yet
+    if (sale === null && offer.price != null) sale = parseFloat(String(offer.price));
+  }
+
+  return { sale, original, currency };
+}
+
+function resolveImage(image: SchemaProduct["image"]): string {
+  if (!image) return "";
+  if (typeof image === "string") return image;
+  if (Array.isArray(image)) return typeof image[0] === "string" ? image[0] : "";
+  return image.url ?? "";
+}
+
+function toFetchedProduct(p: SchemaProduct, category: string): FetchedProduct {
+  const { sale, original, currency } = extractPrices(p.offers);
+  return {
+    name: p.name ?? "Unknown",
+    category,
+    originalPrice: original,
+    salePrice: sale,
+    currency,
+    imageUrl: resolveImage(p.image),
+    productUrl: p.url ?? "",
+  };
+}
+
+// ─── Generic: schema.org JSON-LD ─────────────────────────────────────────────
+
+/**
+ * Extract and normalize all schema.org Product objects from a page's JSON-LD
+ * script blocks into FetchedProduct[].
+ */
+export function extractJsonLdProducts(html: string, category: string): FetchedProduct[] {
+  const scriptRe = /<script\s[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  const products: FetchedProduct[] = [];
+
+  for (const match of html.matchAll(scriptRe)) {
+    let parsed: unknown;
+    try { parsed = JSON.parse(match[1]); } catch { continue; }
+
+    const items: unknown[] = Array.isArray(parsed) ? parsed : [parsed];
+
+    for (const item of items) {
+      if (!item || typeof item !== "object") continue;
+      const obj = item as Record<string, unknown>;
+
+      if (obj["@type"] === "Product") {
+        products.push(toFetchedProduct(obj as SchemaProduct, category));
+      } else if (obj["@type"] === "ItemList") {
+        const elements = (obj["itemListElement"] as Array<Record<string, unknown>>) ?? [];
+        for (const el of elements) {
+          const inner = (el["item"] ?? el) as Record<string, unknown>;
+          if (inner?.["@type"] === "Product") {
+            products.push(toFetchedProduct(inner as SchemaProduct, category));
+          }
+        }
+      }
+    }
+  }
+
+  return products;
+}
+
+// ─── Next.js __NEXT_DATA__ fallback ──────────────────────────────────────────
+//
+// Sites built with Next.js embed server-side state in __NEXT_DATA__. When a
+// site doesn't include schema.org JSON-LD, we read that blob and normalize
+// products to FetchedProduct[].
+//
+// To add another Next.js retailer, add a normalizer below and call it from
+// extractNextDataProducts() after detecting a site-specific state key.
+
+interface NikeWallProduct {
+  globalProductId?: string;
+  copy?: { title?: string; subTitle?: string };
+  prices?: { currentPrice?: number; initialPrice?: number; currency?: string };
+  colorwayImages?: { portraitURL?: string };
+  pdpUrl?: { url?: string };
+}
+
+function normalizeNikeWall(
+  state: Record<string, unknown>,
+  category: string
+): FetchedProduct[] {
+  const groupings = (state?.Wall as Record<string, unknown>)
+    ?.productGroupings as Array<{ products?: NikeWallProduct[] }> ?? [];
+
+  return groupings.flatMap((group) =>
+    (group.products ?? []).map((p): FetchedProduct => ({
+      name: [p.copy?.title, p.copy?.subTitle].filter(Boolean).join(" — ") || "Unknown",
+      category,
+      originalPrice: p.prices?.initialPrice  ?? null,
+      salePrice:     p.prices?.currentPrice  ?? null,
+      currency:      p.prices?.currency      ?? "USD",
+      imageUrl:      p.colorwayImages?.portraitURL ?? "",
+      productUrl:    p.pdpUrl?.url ?? "",
+    }))
+  );
 }
 
 /**
- * Convert a nike.com/w/… store URL into the product feed API URL.
- * The API returns clean JSON with prices — no HTML parsing needed.
+ * Extract products from a Next.js __NEXT_DATA__ blob and normalize them to
+ * FetchedProduct[]. Returns an empty array if the blob is absent or contains
+ * no recognizable product structure.
  */
-export function nikeStoreUrlToApiUrl(storeUrl: string, count = 60): string {
-  const conceptIds = conceptIdsForNikeUrl(storeUrl);
-  const attributeFilter = conceptIds.length
-    ? `&filter=attributeIds(${conceptIds.join(",")})`
-    : "";
-
-  const endpoint = [
-    "/product_feed/rollup_threads/v2",
-    "?filter=marketplace(US)",
-    "&filter=language(en)",
-    "&filter=employeePrice(true)",
-    attributeFilter,
-    `&sort=effectiveStartViewDateDesc`,
-    `&anchor=0`,
-    `&count=${count}`,
-  ].join("");
-
-  const params = new URLSearchParams({
-    queryid:     "products",
-    anonymousId: crypto.randomUUID(),
-    country:     "US",
-    endpoint,
-    language:    "en",
-    localizedRangeStr: "{lowestPrice}—{highestPrice}",
-  });
-
-  return `https://api.nike.com/cic/browse/v2?${params}`;
-}
-
-// ─── Macy's HTML extractor ────────────────────────────────────────────────────
-
-export function extractMacysData(html: string): string | null {
+export function extractNextDataProducts(html: string, category: string): FetchedProduct[] {
   const match = html.match(
-    /window\.__PRELOADED_STATE__\s*=\s*({[\s\S]*?});\s*<\/script>/
+    /<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/
   );
-  return match ? match[1].slice(0, 60_000) : null;
-}
+  if (!match) return [];
 
-type ExtractorFn = (html: string) => string | null;
+  let data: Record<string, unknown>;
+  try { data = JSON.parse(match[1]); } catch { return []; }
 
-const HTML_EXTRACTORS: Record<string, ExtractorFn> = {
-  macys: extractMacysData,
-};
+  const state = (
+    (data?.props as Record<string, unknown>)?.pageProps as Record<string, unknown>
+  )?.initialState as Record<string, unknown>;
 
-export function extractForRetailer(html: string, retailer: string): string {
-  const fn = HTML_EXTRACTORS[retailer.toLowerCase()];
-  if (fn) {
-    const result = fn(html);
-    if (result) return result;
-  }
-  // Fallback: trimmed raw HTML
-  return html.slice(0, 30_000);
+  if (!state) return [];
+
+  // Nike: Wall.productGroupings[]
+  if (state.Wall) return normalizeNikeWall(state, category);
+
+  return [];
 }

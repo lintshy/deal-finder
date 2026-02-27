@@ -1,11 +1,10 @@
-import { handler } from "../src/handler";
-import { BedrockAgentEvent } from "../src/types";
+import { BedrockFunctionEvent, handler } from "../src/handler";
 
 // Pick which event to run via command line arg: npx ts-node test/runLocal.ts fetchPage
 const toolName = process.argv[2] ?? "fetchPage";
 
 async function run() {
-  let event: BedrockAgentEvent;
+  let event: BedrockFunctionEvent
 
   try {
     event = require(`./events/${toolName}.json`);
@@ -18,7 +17,7 @@ async function run() {
   console.log(`\n🚀 Running tool: ${event.function}`);
   console.log("─".repeat(50));
 
-  const response = await handler(event, {} as any);
+  const response = await handler(event);
 
   console.log("\n✅ Raw Bedrock Response:");
   console.log(JSON.stringify(response, null, 2));

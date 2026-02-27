@@ -9,8 +9,8 @@
         "properties": [
           {
             "name": "content",
-            "type": "string",
-            "value": "{\"props\":{\"pageProps\":{\"initialState\":{\"Wall\":{\"products\":[{\"id\":\"abc123\",\"title\":\"Air Max 90\",\"url\":\"/t/air-max-90\",\"prices\":{\"compareAtPrice\":{\"value\":120},\"currentPrice\":{\"value\":72}},\"images\":{\"portraitURL\":\"https://static.nike.com/img.jpg\"}}]}}}}}"
+            "type": "array",
+            "value": "[{\"name\":\"Nike Air Max 90 — Men's Shoes\",\"category\":\"sneakers\",\"originalPrice\":120,\"salePrice\":72,\"currency\":\"USD\",\"imageUrl\":\"https://static.nike.com/a/images/img.jpg\",\"productUrl\":\"https://www.nike.com/t/air-max-90-mens-shoes\"},{\"name\":\"Nike Revolution 7 — Men's Road Running Shoes\",\"category\":\"sneakers\",\"originalPrice\":65,\"salePrice\":52,\"currency\":\"USD\",\"imageUrl\":\"https://static.nike.com/a/images/rev7.jpg\",\"productUrl\":\"https://www.nike.com/t/revolution-7-mens-shoes\"},{\"name\":\"Nike Dunk Low — Shoes\",\"category\":\"sneakers\",\"originalPrice\":110,\"salePrice\":110,\"currency\":\"USD\",\"imageUrl\":\"https://static.nike.com/a/images/dunk.jpg\",\"productUrl\":\"https://www.nike.com/t/dunk-low-shoes\"}]"
           },
           {
             "name": "retailer",
