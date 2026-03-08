@@ -5,21 +5,25 @@
         "version": "1.0.0"
     },
     "paths": {
-        "/fetch_page": {
+        "/scrape_deals": {
             "post": {
-                "operationId": "fetch_page",
-                "description": "Fetches a retailer product listing or sale page and returns a normalised list of products with name, pricing, and image data. Tries schema.org JSON-LD first, then falls back to Next.js __NEXT_DATA__. Pass the returned products array (JSON-stringified) as the content parameter to parse_deals.",
+                "operationId": "scrape_deals",
+                "description": "Fetches a retailer page URL and uses Claude to extract products with significant discounts. Returns a structured list of deals to be passed directly to save_deals.",
                 "requestBody": {
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "type": "object",
-                                "required": ["url", "retailer"],
+                                "required": [
+                                    "url",
+                                    "retailer",
+                                    "category"
+                                ],
                                 "properties": {
                                     "url": {
                                         "type": "string",
-                                        "description": "Full URL of the retailer sale or category page to scrape"
+                                        "description": "Full URL of the retailer sale or category page"
                                     },
                                     "retailer": {
                                         "type": "string",
@@ -27,7 +31,15 @@
                                     },
                                     "category": {
                                         "type": "string",
-                                        "description": "Product category being scraped e.g. sneakers hoodies dresses"
+                                        "description": "Product category e.g. sneakers hoodies dresses"
+                                    },
+                                    "min_discount_pct": {
+                                        "type": "string",
+                                        "description": "Minimum discount percentage to include. Defaults to 30"
+                                    },
+                                    "audience": {
+                                        "type": "string",
+                                        "description": "Target audience for the products e.g. men"
                                     }
                                 }
                             }
@@ -36,69 +48,27 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Products extracted successfully",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": { "type": "boolean" },
-                                        "url": { "type": "string" },
-                                        "category": { "type": "string" },
-                                        "retailer": { "type": "string" },
-                                        "productCount": { "type": "integer" },
-                                        "products": {
-                                            "type": "array",
-                                            "description": "Normalised product list. JSON-stringify this array and pass it as the content parameter to parse_deals.",
-                                            "items": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "name":          { "type": "string" },
-                                                    "category":      { "type": "string" },
-                                                    "originalPrice": { "type": "number", "nullable": true },
-                                                    "salePrice":     { "type": "number", "nullable": true },
-                                                    "currency":      { "type": "string" },
-                                                    "imageUrl":      { "type": "string" },
-                                                    "productUrl":    { "type": "string" }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        "description": "Deals extracted successfully"
                     }
                 }
             }
         },
-        "/parse_deals": {
+        "/save_deals": {
             "post": {
-                "operationId": "parse_deals",
-                "description": "Filters the products returned by fetch_page to those with a discount meeting the minimum threshold, calculates the discount percentage, and returns a structured deals list ready for save_deals.",
+                "operationId": "save_deals",
+                "description": "Saves deals to DynamoDB. Accepts the exact response shape returned by scrape_deals.",
                 "requestBody": {
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "type": "object",
-                                "required": ["content", "retailer"],
+                                "required": [
+                                    "retailer",
+                                    "category",
+                                    "deals"
+                                ],
                                 "properties": {
-                                    "content": {
-                                        "type": "array",
-                                        "description": "Products array from the fetch_page response",
-                                        "items": {
-                                            "type": "object",
-                                            "properties": {
-                                                "name":          { "type": "string" },
-                                                "category":      { "type": "string" },
-                                                "originalPrice": { "type": "number", "nullable": true },
-                                                "salePrice":     { "type": "number", "nullable": true },
-                                                "currency":      { "type": "string" },
-                                                "imageUrl":      { "type": "string" },
-                                                "productUrl":    { "type": "string" }
-                                            }
-                                        }
-                                    },
                                     "retailer": {
                                         "type": "string",
                                         "description": "Retailer identifier e.g. nike or macys"
@@ -107,37 +77,17 @@
                                         "type": "string",
                                         "description": "Product category e.g. sneakers"
                                     },
-                                    "min_discount_pct": {
+                                    "dealsFound": {
                                         "type": "string",
-                                        "description": "Minimum discount percentage to include as a deal. Defaults to 30 if not provided"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Deals filtered and shaped successfully"
-                    }
-                }
-            }
-        },
-        "/save_deals": {
-            "post": {
-                "operationId": "save_deals",
-                "description": "Saves a list of parsed deals to DynamoDB. The deals parameter must be a JSON stringified array of deal objects returned from parse_deals.",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "required": ["deals"],
-                                "properties": {
+                                        "description": "Number of deals found as returned by scrape_deals"
+                                    },
                                     "deals": {
                                         "type": "string",
-                                        "description": "JSON stringified array of deal objects returned from parse_deals"
+                                        "description": "JSON stringified array of deal objects returned from scrape_deals"
+                                    },
+                                    "audience": {
+                                        "type": "string",
+                                        "description": "Target audience for the products e.g. men"
                                     }
                                 }
                             }

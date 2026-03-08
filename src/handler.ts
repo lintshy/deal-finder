@@ -3,6 +3,7 @@ import { buildResponse, errorResponse } from "./utils/response";
 import { fetchPage } from "./tools/fetchPage";
 import { parseDeals } from "./tools/parseDeals";
 import { saveDeals } from "./tools/saveDeals";
+import { scrapeDeals } from "./tools/scrapeDeals";
 
 // API schema event format (what we're receiving)
 interface BedrockApiEvent {
@@ -45,10 +46,10 @@ export interface BedrockFunctionEvent {
 type BedrockEvent = BedrockApiEvent | BedrockFunctionEvent;
 
 const TOOL_MAP: Record<string, ToolHandler> = {
-  fetch_page: fetchPage,
-  parse_deals: parseDeals,
+  scrape_deals: scrapeDeals,   // ← replaces fetch_page + parse_deals
   save_deals: saveDeals,
 };
+
 
 function extractToolName(event: BedrockEvent): string {
   // API schema format uses apiPath e.g. /fetch_page
